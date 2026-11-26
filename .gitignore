@@ -6,6 +6,7 @@
 # Hugo output and image cache; regenerate from the BQB source folders.
 /.hugo-generated/
 /.hugo-cache/
+/.sticker-catalog/
 /.hugo_build.lock
 /public-hugo/
 /maker/dist/
