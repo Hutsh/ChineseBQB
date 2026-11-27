@@ -13,6 +13,7 @@ DEFAULT_CATALOG = ROOT / "sticker-index.jsonl"
 OCCASIONS = ("generic", "morning", "bedtime", "spring_festival", "meal", "other")
 ACTION_SCOPES = ("generic", "purchase", "attend", "scout", "other")
 RESPONSE_MODES = ("generic", "explicit_ack", "implicit_ack", "empathize", "cheer_up", "reassure")
+EXPRESSION_STYLES = ("neutral", "stoic", "rugged", "restrained", "warm", "cute", "playful", "deadpan", "exaggerated", "absurd")
 INTENTS = (
     "acknowledge", "accept_task", "agree", "thank", "congratulate", "comfort",
     "apologize", "understand", "surprise", "confusion", "greet", "farewell",
@@ -190,6 +191,18 @@ def rank_with_profile(item, args):
     cap = getattr(args, "max_expressiveness", None)
     if cap is not None and (expressiveness is None or expressiveness > cap):
         return None
+    styles = set(labels(profile, "expression_styles"))
+    cuteness = level(profile, "cuteness")
+    avoid_styles = set(getattr(args, "avoid_style", ()) or ())
+    max_cuteness = getattr(args, "max_cuteness", None)
+    if avoid_styles and (not styles or styles & avoid_styles):
+        return None
+    if max_cuteness is not None and (cuteness is None or cuteness > max_cuteness):
+        return None
+    if styles.intersection(getattr(args, "prefer_style", ()) or ()):
+        ranked["score"] += 3
+        ranked["match_reasons"].append("preferred_style")
+    ranked["selection_profile"] = profile
     return ranked
 
 
@@ -239,6 +252,9 @@ def main():
     parser.add_argument("--warmth", type=level_arg, help="Preferred warmth")
     parser.add_argument("--expressiveness", type=level_arg, help="Preferred expressiveness")
     parser.add_argument("--max-expressiveness", type=level_arg, help="Hard persona ceiling")
+    parser.add_argument("--max-cuteness", type=level_arg, help="Hard persona ceiling; excludes unknown cuteness")
+    parser.add_argument("--prefer-style", action="append", choices=EXPRESSION_STYLES, help="Boost a preferred expression style")
+    parser.add_argument("--avoid-style", action="append", choices=EXPRESSION_STYLES, help="Exclude this style and unclassified images")
     parser.add_argument("--occasion", choices=OCCASIONS, help="Actual occasion; defaults to generic")
     parser.add_argument("--require-occasion", action="store_true", help="Require an exact occasion label")
     parser.add_argument("--action-scope", choices=("purchase", "attend", "scout"), help="Actual action being committed")

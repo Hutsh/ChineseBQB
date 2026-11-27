@@ -41,6 +41,12 @@ python -X utf8 scripts/analyze_stickers_cloud.py --workers 3 --batch-size 2 --ti
 | `selection_profile.action_scope` | `generic`、`purchase`、`attend`、`scout`、`other`。标图里明确作出的承诺，尤其要区分「去买」「一定来」「我去探路」。`generic` 和 `other` 无法满足一项已知具体动作的严格匹配。 |
 | `selection_profile.response_mode` | `generic`、`explicit_ack`、`implicit_ack`、`empathize`、`cheer_up`、`reassure`。「收到」才可标明确收悉，「好的」通常只是隐含确认。承认对方感受、劝开心、给出安心保证分别标注。 |
 | `analysis.expressiveness` | `0–4` 的表现张力。Persona 可以传软偏好。确实要求克制时，可以另设最大值。 |
+| `selection_profile.expression_styles` | 从 `neutral`（平实）、`stoic`（冷峻）、`rugged`（硬朗）、`restrained`（克制）、`warm`（温暖）、`cute`（软萌）、`playful`（俏皮）、`deadpan`（冷幽默）、`exaggerated`（浮夸）、`absurd`（无厘头）选 1–3 个。 |
+| `selection_profile.cuteness` | `0–4` 的卖萌程度。按画面、动作和文字的整体效果标注。 |
+
+Persona 可以用 `--prefer-style rugged --prefer-style restrained --max-cuteness 1` 优先选硬朗或克制风格，并排除卖萌超过 1 分或尚未标注的图。`--avoid-style cute` 可排除软萌图和风格未知的图。满足多个偏好只加一次分。
+
+续跑命令加 `--backfill-style` 会先补已完成记录的风格，再继续待分析队列。也可以单独用 `--style-only` 补风格。补标失败时仍保留原分析。
 
 保留原来的意图、承诺状态、表达对象、受众限制、风险、抽象程度和单选 `send_mode`。填表先看**助手把图发出去会表达什么**，尤其留意文字反转、图中人称和动图跨帧变化。分析不确定时写明依据和置信度。
 

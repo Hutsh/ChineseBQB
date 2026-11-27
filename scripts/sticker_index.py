@@ -13,13 +13,14 @@ from uuid import uuid4
 
 from build_site import ROOT, category_identity, folders, image_files
 from build_sticker_catalog import VERSION, media_info, validate
-from select_sticker import ACTION_SCOPES, DEFAULT_CATALOG, OCCASIONS, RESPONSE_MODES
+from select_sticker import ACTION_SCOPES, DEFAULT_CATALOG, EXPRESSION_STYLES, OCCASIONS, RESPONSE_MODES
 
 
 INDEX = DEFAULT_CATALOG
 WORK = ROOT / ".sticker-catalog" / "cloud"
 REVIEWED_SAMPLE = ROOT / ".sticker-catalog" / "reviewed-catalog.jsonl"
 PROFILE_VALUES = {"occasion": OCCASIONS, "action_scope": ACTION_SCOPES, "response_mode": RESPONSE_MODES}
+STYLE_FIELDS = {"expression_styles", "cuteness"}
 
 
 class IndexBusy(RuntimeError):
@@ -54,13 +55,23 @@ def index_lock():
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
+def validate_style(profile):
+    styles, cuteness = profile.get("expression_styles"), profile.get("cuteness")
+    if not isinstance(styles, list) or not 1 <= len(styles) <= 3 or any(s not in EXPRESSION_STYLES for s in styles):
+        raise ValueError("Invalid expression styles")
+    if len(set(styles)) != len(styles) or type(cuteness) is not int or not 0 <= cuteness <= 4:
+        raise ValueError("Invalid duplicate style or cuteness score")
+
+
 def validate_result(analysis, profile):
     validate(analysis)
-    if not isinstance(profile, dict) or set(profile) != set(PROFILE_VALUES):
+    if not isinstance(profile, dict) or set(profile) not in (set(PROFILE_VALUES), set(PROFILE_VALUES) | STYLE_FIELDS):
         raise ValueError("Incomplete selection profile")
     for key, values in PROFILE_VALUES.items():
         if profile[key] not in values:
             raise ValueError(f"Invalid selection profile field: {key}")
+    if STYLE_FIELDS & profile.keys():
+        validate_style(profile)
 
 
 def load_rows(path):
@@ -126,7 +137,10 @@ def initialize_index():
                 except ValueError:
                     continue
                 base.update(analysis_status="visually_reviewed", analysis=analysis, selection_profile=profile,
-                            selection_profile_version=1, evidence=cached.get("evidence", {}))
+                            selection_profile_version=2 if STYLE_FIELDS <= profile.keys() else 1,
+                            evidence=cached.get("evidence", {}))
+                if "style_evidence" in cached:
+                    base["style_evidence"] = cached["style_evidence"]
                 break
             rows.append(base)
     if len({row["id"] for row in rows}) != len(rows):
@@ -196,7 +210,12 @@ def main():
         except (KeyError, OSError, ValueError) as exc:
             parser.exit(1, f"{exc}\n")
         complete = bool(rows) and counts["visually_reviewed"] == len(rows)
-        print(json.dumps(dict(total=len(rows), counts=counts, complete=complete)), flush=True)
+        styled = sum(row['analysis_status'] == 'visually_reviewed' and
+                     STYLE_FIELDS <= row['selection_profile'].keys() for row in rows)
+        style_errors = sum('style_error' in row for row in rows)
+        print(json.dumps(dict(total=len(rows), counts=counts, complete=complete,
+                              style=dict(completed=styled, pending=counts['visually_reviewed'] - styled,
+                                         errors=style_errors))), flush=True)
         return 0 if complete else 2
     try:
         with index_lock():

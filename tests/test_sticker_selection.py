@@ -8,6 +8,16 @@ from select_sticker import select
 
 
 class StickerSelectionTests(unittest.TestCase):
+    def test_persona_excludes_cute_and_unclassified_images(self):
+        cute = self.sticker("a", {"expression_styles": ["cute"], "cuteness": 4})
+        unknown = self.sticker("b")
+        stoic = self.sticker("c", {"expression_styles": ["stoic"], "cuteness": 0})
+        request = self.options(max_cuteness=1, prefer_style=["stoic"])
+        self.assertEqual(select([cute, unknown, stoic], request)[0]["id"], "c")
+        self.assertEqual(select([cute, unknown], request), [])
+        request = self.options(prefer_style=["stoic"])
+        self.assertEqual(select([cute, stoic], request)[0]["id"], "c")
+
     def options(self, **overrides):
         values = dict(intent="acknowledge", audience="team_private", task_state="received",
                       placement="after_text", target=None, max_risk=0, abstraction=(0, 4),

@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import sys
 from types import SimpleNamespace
 import unittest
@@ -9,6 +10,20 @@ import analyze_stickers_cloud as cloud
 
 
 class StickerCloudLimitTests(unittest.TestCase):
+    def test_style_backfill_preserves_prior_analysis_and_makes_progress(self):
+        before = {"id": "a", "analysis_status": "visually_reviewed", "analysis": {"keep": True},
+                  "selection_profile": {"occasion": "general"}, "evidence": {"source": "original"}}
+        item = {"id": "a", "selection_profile": {"expression_styles": ["stoic"], "cuteness": 0}}
+        accepted, issue = cloud.parse_response(json.dumps({"items": [item]}), {"a"}, style_only=True)
+        self.assertFalse(issue)
+        options = SimpleNamespace(style_only=True)
+        self.assertFalse(cloud.reviewed_for_run(before, options))
+        cloud.publish_style(before, accepted["a"])
+        self.assertTrue(cloud.reviewed_for_run(before, options))
+        self.assertEqual(before["analysis"], {"keep": True})
+        self.assertEqual(before["evidence"], {"source": "original"})
+        self.assertEqual(before["selection_profile"], {"occasion": "general", **item["selection_profile"]})
+
     def test_usage_limit_carries_provider_reset_time(self):
         with patch.object(cloud.time, "time", return_value=1_800_000_000):
             with self.assertRaises(cloud.CloudLimit) as caught:
