@@ -180,7 +180,8 @@ def prepare_attachment(row, destination):
         image, frames = preview(source, frame_count)
         recovered = False
     except OSError as exc:
-        if "truncated" not in str(exc).casefold():
+        message = str(exc).casefold()
+        if "truncated" not in message and "broken data stream" not in message:
             raise
         # Pillow's tolerant-decoding setting is process-wide. Keep it isolated
         # so other analysis workers still detect genuinely damaged assets.
